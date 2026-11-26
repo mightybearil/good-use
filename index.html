@@ -132,6 +132,48 @@ body.play main{opacity:0;pointer-events:none}
   width:auto;max-width:300px;opacity:0;pointer-events:none;transition:opacity .6s ease;text-shadow:0 1px 12px #0b1020}
 body.play #playback{opacity:1;pointer-events:auto}
 body.day #playback{text-shadow:0 1px 14px rgba(255,255,255,.95)}
+/* bottom menu */
+#nav{position:fixed;left:0;right:0;bottom:0;z-index:3;display:flex;justify-content:center;gap:2px;
+  padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:rgba(11,16,32,.72);border-top:1px solid var(--line);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);transition:opacity .6s ease}
+#nav button{flex:1;max-width:120px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  background:none;border:0;border-radius:14px;color:var(--soft);font-size:11.5px;cursor:pointer;padding:4px 2px;transition:color .3s,background .3s}
+#nav svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#nav button.on{color:var(--ink);background:rgba(185,166,255,.16)}
+#nav button.on svg{stroke:var(--accent2)}
+body:not(.nonav) main{bottom:calc(65px + env(safe-area-inset-bottom))}
+body.nonav #nav{display:none}
+body.play #nav{opacity:0;pointer-events:none}
+body.day #nav{background:rgba(255,255,255,.78)}
+body.day #nav button.on{background:rgba(106,85,216,.12)}
+/* calendar */
+:root{--c-clean:#6fd6b4;--c-urge:#a998ff;--c-used:#f0a36a}
+body.day{--c-clean:#2fa37f;--c-urge:#7c66e0;--c-used:#d9822f}
+.calhead{display:flex;align-items:center;justify-content:space-between;margin:4px 0 8px}
+.calhead strong{font-size:17px}
+.calhead .ic{background:none;font-size:22px;line-height:1}
+.calhead .ic:disabled{opacity:.25;cursor:default}
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.calgrid.wd{font-size:12px;color:var(--soft);margin-bottom:4px}
+.cd{aspect-ratio:1;min-height:38px;border-radius:50%;border:1.5px solid transparent;background:none;color:var(--ink);
+  font:inherit;font-size:14.5px;font-variant-numeric:tabular-nums;cursor:pointer;padding:0;transition:background .3s,border-color .3s}
+.cd.future{opacity:.35}
+.cd.today{font-weight:700}
+.cd.sel{border-color:var(--ink)}
+.cd.clean{background:var(--c-clean);color:#0b1020}
+.cd.urge{background:var(--c-urge);color:#0b1020}
+.cd.used{background:var(--c-used);color:#0b1020}
+body.day .cd.clean,body.day .cd.urge,body.day .cd.used{color:#fff}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:14px;font-size:13.5px;color:var(--soft)}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend b{color:var(--ink);font-variant-numeric:tabular-nums}
+.legend i,.daykind i{width:12px;height:12px;border-radius:50%;flex:none}
+i.clean{background:var(--c-clean)} i.urge{background:var(--c-urge)} i.used{background:var(--c-used)}
+.daykind{display:flex;align-items:center;gap:8px;color:var(--ink)}
+.ev{display:grid;grid-template-columns:auto 1fr;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.ev small{color:var(--soft);font-variant-numeric:tabular-nums;padding-top:2px;min-width:44px}
+.ev strong{color:var(--ink);font-weight:600}
+.ev p{margin:2px 0 0;font-size:14.5px}
 @media (prefers-reduced-motion:reduce){main,#playback{transition:none}#view{animation:none}.btn,.chip{transition:none}}
 </style>
 </head>
@@ -144,6 +186,7 @@ body.day #playback{text-shadow:0 1px 14px rgba(255,255,255,.95)}
 </header>
 <main id="main"><div id="view"></div></main>
 <button class="btn quiet" id="playback" tabindex="-1"></button>
+<nav id="nav"></nav>
 
 <div class="modal" id="about" hidden><div class="card" id="aboutCard"></div></div>
 
@@ -194,6 +237,7 @@ function save() { try { localStorage.setItem('gooduse', JSON.stringify(S)); } ca
 let S = load();
 let cur = null;   // check-in in progress
 let G = null;     // active mini-game
+let tab = 'garden';  // which item of the bottom menu is lit
 let hero = null;      // close-up of a plant growing, on the "Planted" screen
 let newPlant = null;  // the newest plant, which then grows in its own spot in the garden
 
@@ -681,6 +725,36 @@ Object.assign(L.he, {
     'לקבוע מתי אטפל בזה'],
   playHint: 'אפשר לגעת בעץ, בפרחים ובשמיים', playBack: 'חזרה'
 });
+Object.assign(L.en, {
+  nav: ['Garden', 'Progress', 'Looking back', 'Calendar'], ariaNav: 'Main menu',
+  calH: 'Calendar', calP: 'Every day of your break, and every day you checked in.',
+  calKinds: { clean: 'No use', urge: 'An urge, no use', used: 'Used' },
+  calNoBreak: 'Start a break under Progress, and the days without using will show here too.',
+  prevM: 'Previous month', nextM: 'Next month',
+  dayStatus: { clean: 'A day of your break without using.', urge: 'An urge came, and you did not use.', used: 'You used on this day.' },
+  calNone: 'Nothing logged on this day.', calFuture: 'This day has not come yet.',
+  evCheck: m => `Check-in: ${m}`, evFeel: (b, a) => a == null ? `Feeling ${b} of 10` : `Feeling ${b} → ${a} of 10`,
+  evPause: g => `Paused with ${g}`, evWord: w => `Named it: ${w}`,
+  evOut: { skip: 'Skipped this time', wait: 'Waited 20 minutes', intent: 'Went ahead with an intention' },
+  evFor: p => `For: ${p}`, evBound: b => `Boundary: ${b}`, evGrams: g => `About ${g} g`, evReview: r => `Afterwards: ${r}`,
+  evSlip: 'Used during the break', evStep: s => `Small step: ${s}`, evDone: 'done',
+  evSym: 'Body check', evBreak: 'Your break began'
+});
+Object.assign(L.he, {
+  nav: ['גינה', 'התקדמות', 'מבט לאחור', 'לוח שנה'], ariaNav: 'תפריט ראשי',
+  calH: 'לוח שנה', calP: 'כל יום בהפסקה שלך, וכל יום שעשית בו צ׳ק-אין.',
+  calKinds: { clean: 'בלי שימוש', urge: 'דחף, בלי שימוש', used: 'שימוש' },
+  calNoBreak: 'אפשר להתחיל הפסקה במסך ההתקדמות, ואז יופיעו כאן גם הימים בלי שימוש.',
+  prevM: 'החודש הקודם', nextM: 'החודש הבא',
+  dayStatus: { clean: 'יום בהפסקה בלי שימוש.', urge: 'הגיע דחף, ולא השתמשת.', used: 'ביום הזה היה שימוש.' },
+  calNone: 'לא נרשם כלום ביום הזה.', calFuture: 'היום הזה עוד לא הגיע.',
+  evCheck: m => `צ׳ק-אין: ${m}`, evFeel: (b, a) => a == null ? `עוצמה ${b} מתוך 10` : `עוצמה ${b} ← ${a} מתוך 10`,
+  evPause: g => `הפסקה עם ${g}`, evWord: w => `שם לתחושה: ${w}`,
+  evOut: { skip: 'דילוג הפעם', wait: 'המתנה של 20 דקות', intent: 'המשך מתוך כוונה' },
+  evFor: p => `בשביל: ${p}`, evBound: b => `גבול: ${b}`, evGrams: g => `בערך ${g} גרם`, evReview: r => `אחר כך: ${r}`,
+  evSlip: 'שימוש במהלך ההפסקה', evStep: s => `צעד קטן: ${s}`, evDone: 'נעשה',
+  evSym: 'בדיקת גוף', evBreak: 'ההפסקה התחילה'
+});
 const isDay = () => S.theme === 'day' || (S.theme !== 'night' && new Date().getHours() >= 6 && new Date().getHours() < 18);
 let dayOn = false, dayMix = 0;
 function applyTheme() {
@@ -703,6 +777,8 @@ function playTouch() {
 }
 function show(html, playing) {
   clearTimeout(playT); document.body.classList.remove('play');
+  document.body.classList.toggle('nonav', !!playing || !!ob || !S.profile);
+  renderNav();
   hero = null;
   main.classList.toggle('playing', !!playing);
   applyTheme();
@@ -720,7 +796,7 @@ function addEntry(x) {
 
 /* ---------- screens ---------- */
 function home() {
-  G = null; cur = null;
+  G = null; cur = null; tab = 'garden';
   const h = new Date().getHours();
   const hi = txt('hi')[h < 5 ? 0 : h < 12 ? 1 : h < 18 ? 2 : 3];
   const now = Date.now();
@@ -754,9 +830,7 @@ function home() {
   show(`<h1>${hi}${nm}.</h1>
     <button class="thought" data-act="nextthought" aria-label="${txt('ariaThought')}">${thoughtHTML()}</button>
     ${brk}${extra}
-    <button class="btn primary" data-act="checkin">${txt('checkin')}</button>
-    <div class="row2"><button class="btn" data-act="progress">${txt('myProgress')}</button>
-    <button class="btn" data-act="look">${txt('lookBack')}</button></div>`);
+    <button class="btn primary" data-act="checkin">${txt('checkin')}</button>`);
   tickWait();
 }
 
@@ -816,6 +890,7 @@ const readDate = id => { const el = $(id), tm = el ? new Date(el.value).getTime(
 /* ---------- break, savings and health progress ---------- */
 const MILE_DAYS = [1, 2, 3, 7, 14, 21, 28, 30, 90];   // matches the order of the "miles" text
 function progress(edit) {
+  tab = 'progress';
   const now = Date.now();
   if (!S.breakStart || edit === 'edit') {
     return show(`<div class="card"><h2>${txt(S.breakStart ? 'changeDate' : 'startBreak')}</h2>
@@ -857,8 +932,7 @@ function progress(edit) {
     <p style="margin:12px 0 0;font-size:14px">${txt('doctor')}</p></div>
     <div class="card"><button class="btn" data-act="progress" data-arg="edit" style="margin-top:0">${txt('changeDate')}</button>
     <button class="btn" data-act="slip">${txt('slipBtn')}</button>
-    <button class="btn" data-act="editme">${txt('editMe')}</button>
-    <button class="btn quiet" data-act="home">${txt('backGarden')}</button></div>`);
+    <button class="btn" data-act="editme">${txt('editMe')}</button></div>`);
   tickWait();
 }
 function slip() {
@@ -1009,12 +1083,13 @@ function planted(e, msg) {
   newPlant = { i: S.entries.length - 1, t: 0 };
 }
 function look() {
+  tab = 'look';
   const now = Date.now();
   const a = S.entries.filter(e => e.t > now - 7 * DAY);
   const b = S.entries.filter(e => e.t <= now - 7 * DAY && e.t > now - 14 * DAY);
   if (!a.length) {
     return show(`<div class="card"><h2>${txt('lookBack')}</h2><p>${txt('lookEmpty')}</p>
-      <button class="btn" data-act="home">${txt('backGarden')}</button></div>`);
+      </div>`);
   }
   const cnt = k => a.filter(e => e.motive === k).length;
   const max = Math.max(...MK.map(cnt), 1);
@@ -1035,12 +1110,106 @@ function look() {
     ${drop == null ? '' : stat(txt('avgChange'), txt('points', '<bdi>' + (drop > 0 ? '−' : drop < 0 ? '+' : '') + Math.abs(drop).toFixed(1) + '</bdi>'))}
     ${stat(txt('skipped'), oc('skip'))}${stat(txt('waited'), oc('wait'))}${stat(txt('went'), oc('intent'))}
     ${stepsDone ? stat(txt('stepsDone'), stepsDone) : ''}</div>
-    ${patterns()}
-    <button class="btn" data-act="home">${txt('backGarden')}</button>`);
+    ${patterns()}`);
+}
+
+/* ---------- calendar ---------- */
+/* break periods: earlier ones are kept in S.breaks as [start, end]; the current one runs from S.breakStart to now */
+const keepBreak = end => { if (S.breakStart && end > S.breakStart) (S.breaks = S.breaks || []).push([S.breakStart, end]); };
+const breakPeriods = () => (S.breaks || []).concat(S.breakStart ? [[S.breakStart, Date.now()]] : []);
+function dayKind(start) {   // start = local midnight of the day
+  const end = start + DAY, inDay = x => x.t >= start && x.t < end;
+  const es = S.entries.filter(inDay);
+  if (es.some(e => e.outcome === 'intent') || (S.slips || []).some(inDay)) return 'used';
+  if (es.length) return 'urge';
+  if (start <= Date.now() && breakPeriods().some(([a, b]) => a < end && b > start)) return 'clean';
+  return '';
+}
+let calM = null, calSel = null;   // month on show (its first day) and the selected day (its midnight)
+function calendar(arg) {
+  tab = 'cal';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (!calM || arg === 'today') { calM = new Date(today.getFullYear(), today.getMonth(), 1); calSel = today.getTime(); }
+  const y = calM.getFullYear(), m = calM.getMonth(), n = new Date(y, m + 1, 0).getDate(), first = calM.getDay();
+  const k = txt('calKinds'), count = { clean: 0, urge: 0, used: 0 };
+  const wd = [0, 1, 2, 3, 4, 5, 6].map(i => `<span>${new Date(2024, 0, 7 + i).toLocaleDateString(lang, { weekday: 'narrow' })}</span>`).join('');
+  let cells = '<span></span>'.repeat(first);
+  for (let d = 1; d <= n; d++) {
+    const t = new Date(y, m, d).getTime(), kind = dayKind(t);
+    if (kind) count[kind]++;
+    cells += `<button class="cd${kind ? ' ' + kind : ''}${t === today.getTime() ? ' today' : ''}${t === calSel ? ' sel' : ''}${t > today.getTime() ? ' future' : ''}"
+      data-act="calday" data-arg="${t}" aria-label="${new Date(t).toLocaleDateString(lang, { day: 'numeric', month: 'long' })}${kind ? ', ' + k[kind] : ''}">${d}</button>`;
+  }
+  const rtl = lang === 'he', canNext = new Date(y, m + 1, 1) <= today;
+  show(`<div class="card"><h2>${txt('calH')}</h2><p>${txt('calP')}</p>
+    <div class="calhead"><button class="ic" data-act="calmove" data-arg="-1" aria-label="${txt('prevM')}">${rtl ? '›' : '‹'}</button>
+      <strong>${calM.toLocaleDateString(lang, { month: 'long', year: 'numeric' })}</strong>
+      <button class="ic" data-act="calmove" data-arg="1" aria-label="${txt('nextM')}"${canNext ? '' : ' disabled'}>${rtl ? '‹' : '›'}</button></div>
+    <div class="calgrid wd" aria-hidden="true">${wd}</div>
+    <div class="calgrid">${cells}</div>
+    <div class="legend">${['clean', 'urge', 'used'].map(c => `<span><i class="${c}"></i>${k[c]} <b>${count[c]}</b></span>`).join('')}</div>
+    ${breakPeriods().length ? '' : `<p style="margin:10px 0 0;font-size:14px">${txt('calNoBreak')}</p>`}</div>
+    <div class="card" id="dayinfo">${dayHTML(calSel)}</div>`);
+}
+/* what happened on one day, in time order */
+function dayHTML(start) {
+  const end = start + DAY, inDay = x => x.t >= start && x.t < end, ev = [];
+  const tm = t => new Date(t).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
+  for (const e of S.entries.filter(inDay)) {
+    const mo = txt('motives')[e.motive], lines = [];
+    if (e.before != null) lines.push(txt('evFeel', e.before, e.after));
+    if (e.skill && txt('games')[e.skill]) lines.push(txt('evPause', txt('games')[e.skill][0]));
+    if (e.word != null && txt('words')[e.word]) lines.push(txt('evWord', txt('words')[e.word]));
+    const out = txt('evOut')[e.outcome];
+    if (out) lines.push(`<span class="cheer">${out}</span>`);
+    const pi = e.pi != null ? txt('purposes')[e.pi] : e.intent, bi = e.bi != null ? txt('bounds')[e.bi] : e.boundary;
+    if (pi) lines.push(txt('evFor', esc(pi)));
+    if (bi) lines.push(txt('evBound', esc(bi)));
+    if (e.grams) lines.push(txt('evGrams', e.grams));
+    const rv = { glad: 1, mixed: 2, differently: 3 }[e.review];
+    if (rv) lines.push(txt('evReview', txt('review')[rv]));
+    ev.push([e.t, mo ? txt('evCheck', mo.name) : txt('checkin'), lines]);
+  }
+  for (const s of (S.slips || []).filter(inDay)) ev.push([s.t, txt('evSlip'), s.grams ? [txt('evGrams', s.grams)] : []]);
+  for (const s of (S.steps || []).filter(inDay)) ev.push([s.t, txt('evStep', '<bdi>' + esc(s.step) + '</bdi>'), s.done === 'yes' ? [txt('evDone')] : []]);
+  for (const s of (S.sym || []).filter(inDay)) ev.push([s.t, txt('evSym'), [txt('symNames').map((nm, i) => `${nm}: ${s.v[i]}`).join(' · ')]]);
+  for (const [a] of breakPeriods()) if (a >= start && a < end) ev.push([a, txt('evBreak'), []]);
+  ev.sort((a, b) => a[0] - b[0]);
+  const kind = dayKind(start);
+  return `<h2>${new Date(start).toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
+    ${kind ? `<p class="daykind"><i class="${kind}"></i>${txt('dayStatus')[kind]}</p>` : ''}
+    ${start > Date.now() ? `<p style="margin:0">${txt('calFuture')}</p>` : ev.length ? ev.map(([t, h, l]) =>
+      `<div class="ev"><small>${tm(t)}</small><div><strong>${h}</strong>${l.map(x => `<p>${x}</p>`).join('')}</div></div>`).join('')
+      : `<p style="margin:0">${txt('calNone')}</p>`}`;
+}
+
+/* ---------- bottom menu ---------- */
+const NAV = [
+  ['garden', 'home', '<path d="M12 21v-8"/><path d="M12 13c0-4 3-6.5 7-6.5 0 4-3 6.5-7 6.5z"/><path d="M12 15.5c0-3-2.2-5.5-6-5.5 0 3 2.2 5.5 6 5.5z"/><path d="M7 21h10"/>'],
+  ['progress', 'progress', '<path d="M4 20h16"/><path d="M5 16l4.5-4.5 3.5 3 6-7"/><path d="M15 7.5h4v4"/>'],
+  ['look', 'look', '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5v4h4"/><path d="M12 7.5V12l3 2"/>'],
+  ['cal', 'calendar', '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01"/>']
+];
+function renderNav() {
+  const nav = $('#nav'), names = txt('nav');
+  nav.setAttribute('aria-label', txt('ariaNav'));
+  nav.innerHTML = NAV.map(([id, act, ic], i) => `<button data-nav="${act}"${tab === id ? ' class="on" aria-current="page"' : ''}>
+    <svg viewBox="0 0 24 24" aria-hidden="true">${ic}</svg><span>${names[i]}</span></button>`).join('');
 }
 
 const acts = {
-  home, checkin, look, after, tend,
+  home, checkin, look, after, tend, calendar,
+  calday(t) {
+    calSel = +t;
+    view.querySelectorAll('.cd').forEach(c => c.classList.toggle('sel', +c.dataset.arg === calSel));
+    const d = $('#dayinfo'); d.innerHTML = dayHTML(calSel);
+    d.style.animation = 'none'; void d.offsetWidth; d.style.animation = 'in .5s ease both';
+  },
+  calmove(dir) {
+    calM = new Date(calM.getFullYear(), calM.getMonth() + +dir, 1);
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    calSel = calM.getMonth() === t.getMonth() && calM.getFullYear() === t.getFullYear() ? t.getTime() : calM.getTime(); calendar();
+  },
   motive(k) {
     cur = { motive: k, before: +$('#before').value };
     (k === 'coping' || k === 'conformity') ? tend() : intention();
@@ -1068,7 +1237,7 @@ const acts = {
   sliprestart() {   // the count restarts; the tree keeps every day it has grown
     const now = Date.now();
     (S.slips = S.slips || []).push({ t: now - 1, grams: num($('#sg').value) });
-    S.grown = (S.grown || 0) + Math.max(0, now - S.breakStart) / DAY; S.breakStart = now; save(); leafFall = 5; home();
+    S.grown = (S.grown || 0) + Math.max(0, now - S.breakStart) / DAY; keepBreak(now); S.breakStart = now; save(); leafFall = 5; home();
   },
   outcome(k) {
     const s = $('#after'); if (s) cur.after = +s.value;
@@ -1105,7 +1274,7 @@ const acts = {
     ob = null; save(); home();
   },
   setbreak() { S.breakStart = readDate('#bdate'); save(); progress(); },
-  endbreak() { S.grown = (S.grown || 0) + Math.max(0, Date.now() - S.breakStart) / DAY; S.breakStart = 0; save(); home(); },
+  endbreak() { S.grown = (S.grown || 0) + Math.max(0, Date.now() - S.breakStart) / DAY; keepBreak(Date.now()); S.breakStart = 0; save(); home(); },
   waitok() { S.waitUntil = 0; save(); home(); },
   review(v) { S.entries[S.entries.length - 1].review = v; save(); home(); }
 };
@@ -1136,6 +1305,7 @@ $('#about').addEventListener('click', e => {
     const r = pendingRestore; pendingRestore = null; newPlant = null;
     r.entries = r.entries.filter(e => e && isFinite(e.t)); r.breakStart = +r.breakStart || 0; r.grown = +r.grown || 0;
     for (const k of ['steps', 'slips', 'sym']) if (!Array.isArray(r[k])) delete r[k];
+    r.breaks = Array.isArray(r.breaks) ? r.breaks.filter(b => Array.isArray(b) && isFinite(b[0]) && isFinite(b[1])) : [];
     S = r; setLang(S.lang || lang); save(); soundUI(); $('#about').hidden = true; S.profile ? home() : onboard();
     return;
   }
@@ -1603,11 +1773,12 @@ const pup = () => { if (pdown && G && G.up) G.up(); pdown = false; hold = null; 
 addEventListener('pointerup', pup); addEventListener('pointercancel', pup);
 /* garden touches: anywhere that is not a button, a card or a game */
 addEventListener('pointerdown', e => {
-  if (G || !e.target.closest || e.target.closest('button,input,select,textarea,a,label,.card,.modal,header')) return;
+  if (G || !e.target.closest || e.target.closest('button,input,select,textarea,a,label,.card,.modal,header,nav')) return;
   hold = { x: e.clientX, y: e.clientY, d: 0 };
   if (!hero) playTouch();
   touchAt(e.clientX, e.clientY);
 });
+$('#nav').addEventListener('click', e => { const b = e.target.closest('button'); if (b) acts[b.dataset.nav](b.dataset.nav === 'calendar' ? 'today' : undefined); });
 $('#playback').addEventListener('click', () => { hold = null; endPlay(); });
 addEventListener('pointermove', e => {
   if (!hold) return;
