@@ -122,7 +122,17 @@ body.day .ms i{color:#fff}
 body.day .modal{background:rgba(170,200,225,.72)}
 .buy{display:block;width:100%;text-align:start;background:none;border:0;padding:0;margin:0 0 12px;color:var(--ink);cursor:pointer}
 .buy small{display:block;color:var(--soft);font-size:13px}
-@media (prefers-reduced-motion:reduce){#view{animation:none}.btn,.chip{transition:none}}
+body.day .inp{color-scheme:light}
+select.inp{cursor:pointer}
+.inp[hidden]{display:none}
+/* playing with the garden: the screen steps aside until the garden has been quiet for a while */
+main{transition:opacity .6s ease}
+body.play main{opacity:0;pointer-events:none}
+#playback{position:fixed;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom));z-index:3;margin:0 auto;
+  width:auto;max-width:300px;opacity:0;pointer-events:none;transition:opacity .6s ease;text-shadow:0 1px 12px #0b1020}
+body.play #playback{opacity:1;pointer-events:auto}
+body.day #playback{text-shadow:0 1px 14px rgba(255,255,255,.95)}
+@media (prefers-reduced-motion:reduce){main,#playback{transition:none}#view{animation:none}.btn,.chip{transition:none}}
 </style>
 </head>
 <body>
@@ -133,6 +143,7 @@ body.day .modal{background:rgba(170,200,225,.72)}
   <button class="ic" id="bSound" aria-label="Music on or off">♪</button>
 </header>
 <main id="main"><div id="view"></div></main>
+<button class="btn quiet" id="playback" tabindex="-1"></button>
 
 <div class="modal" id="about" hidden><div class="card" id="aboutCard"></div></div>
 
@@ -652,13 +663,46 @@ const ICONS = {
 const opt = (act, arg, label, sub, on) => `<button class="btn opt ico${on ? ' on' : ''}" data-act="${act}" data-arg="${arg}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[arg]}</svg><span>${label}<small>${sub}</small></span></button>`;
 const kindOf = e => e.outcome !== 'intent' ? 'moon' : (e.motive === 'coping' || e.motive === 'conformity') ? 'reed' : 'lantern';
 
+Object.assign(L.en, {
+  choose: 'Choose…', ownOpt: 'Something else…',
+  stepAbouts: ['Work or studies', 'Money', 'A relationship or family', 'Loneliness', 'My health or my body',
+    'Tiredness or poor sleep', 'Boredom or emptiness', 'A task I keep putting off', 'Something from the past', 'I am not sure'],
+  stepSteps: ['Write down what is bothering me', 'Send one message to someone', 'Do the first small part of it',
+    'Take a short walk', 'Drink water and step outside', 'Tidy one small thing', 'Rest a few minutes without a screen',
+    'Decide when I will deal with it'],
+  playHint: 'Touch the tree, the flowers, the sky', playBack: 'Back'
+});
+Object.assign(L.he, {
+  choose: 'בחירה…', ownOpt: 'משהו אחר…',
+  stepAbouts: ['עבודה או לימודים', 'כסף', 'זוגיות או משפחה', 'בדידות', 'הבריאות או הגוף שלי',
+    'עייפות או חוסר שינה', 'שעמום או ריקנות', 'משימה שאני דוחה', 'משהו מהעבר', 'לא ברור לי'],
+  stepSteps: ['לכתוב מה מטריד אותי', 'לשלוח הודעה אחת למישהו', 'לעשות את החלק הקטן הראשון',
+    'לצאת להליכה קצרה', 'לשתות מים ולצאת לאוויר', 'לסדר דבר קטן אחד', 'לנוח כמה דקות בלי מסך',
+    'לקבוע מתי אטפל בזה'],
+  playHint: 'אפשר לגעת בעץ, בפרחים ובשמיים', playBack: 'חזרה'
+});
 const isDay = () => S.theme === 'day' || (S.theme !== 'night' && new Date().getHours() >= 6 && new Date().getHours() < 18);
 let dayOn = false, dayMix = 0;
 function applyTheme() {
   dayOn = isDay();
   document.body.classList.toggle('day', dayOn);
 }
+/* garden play: a tap on the background hides the screen; it comes back after a quiet moment */
+let playT = 0;
+function endPlay() {
+  if (hold) return void (playT = setTimeout(endPlay, 1500));
+  clearTimeout(playT); document.body.classList.remove('play');
+}
+function playTouch() {
+  const b = $('#playback');
+  if (!document.body.classList.contains('play')) {
+    b.innerHTML = `<small style="display:block;font-weight:400">${txt('playHint')}</small>${txt('playBack')}`;
+    document.body.classList.add('play');
+  }
+  clearTimeout(playT); playT = setTimeout(endPlay, 7000);
+}
 function show(html, playing) {
+  clearTimeout(playT); document.body.classList.remove('play');
   hero = null;
   main.classList.toggle('playing', !!playing);
   applyTheme();
@@ -851,12 +895,18 @@ function symScreen() {
     <button class="btn primary" data-act="symsave">${txt('save')}</button>
     <button class="btn quiet" data-act="home">${txt('back')}</button></div>`);
 }
+/* a list of common answers; the free-text field appears only for "Something else" */
+function pickOrOwn(id, q, list, ph) {
+  return `<label class="fl" for="${id}">${txt(q)}</label>
+    <select class="inp" id="${id}" data-own="${id}own"><option value="">${txt('choose')}</option>
+    ${txt(list).map(v => `<option>${v}</option>`).join('')}<option value="own">${txt('ownOpt')}</option></select>
+    <input class="inp" id="${id}own" maxlength="80" placeholder="${txt(ph)}" aria-label="${txt(q)}" hidden>`;
+}
+const pickVal = id => { const s = $('#' + id); return (s.value === 'own' ? $('#' + id + 'own').value : s.value).trim(); };
 function stepScreen() {
   show(`<div class="card"><h2>${txt('stepH')}</h2><p>${txt('stepP')}</p>
-    <label class="fl" for="sabout">${txt('stepAboutQ')}</label>
-    <input class="inp" id="sabout" maxlength="80" placeholder="${txt('stepAboutPh')}">
-    <label class="fl" for="sstep">${txt('stepQ')}</label>
-    <input class="inp" id="sstep" maxlength="80" placeholder="${txt('stepPh')}">
+    ${pickOrOwn('sabout', 'stepAboutQ', 'stepAbouts', 'stepAboutPh')}
+    ${pickOrOwn('sstep', 'stepQ', 'stepSteps', 'stepPh')}
     <button class="btn primary" data-act="stepsave">${txt('stepSave')}</button>
     <button class="btn quiet" data-act="after">${txt('notNow')}</button></div>`);
 }
@@ -1000,7 +1050,7 @@ const acts = {
   slip, sym: symScreen,
   shuffle(a, el) { el.innerHTML = buyHTML(); },
   stepsave() {
-    const s = $('#sstep').value.trim(), a = $('#sabout').value.trim();
+    const s = pickVal('sstep'), a = pickVal('sabout');
     if (s || a) { (S.steps = S.steps || []).push({ t: Date.now(), about: a, step: s || a, done: null }); if (S.steps.length > 50) S.steps.shift(); save(); }
     after();
   },
@@ -1066,6 +1116,7 @@ view.addEventListener('click', e => {
 view.addEventListener('input', e => {
   if (e.target.type === 'range') { const o = view.querySelector(`output[for="${e.target.id}"]`); if (o) o.textContent = e.target.value; }
   if (e.target.id === 'odate' && ob) ob.date = e.target.value;
+  if (e.target.dataset.own) { const o = $('#' + e.target.dataset.own); o.hidden = e.target.value !== 'own'; if (!o.hidden) o.focus(); }
 });
 $('#bAbout').onclick = () => { $('#about').hidden = false; };
 $('#about').addEventListener('click', e => {
@@ -1554,8 +1605,10 @@ addEventListener('pointerup', pup); addEventListener('pointercancel', pup);
 addEventListener('pointerdown', e => {
   if (G || !e.target.closest || e.target.closest('button,input,select,textarea,a,label,.card,.modal,header')) return;
   hold = { x: e.clientX, y: e.clientY, d: 0 };
+  if (!hero) playTouch();
   touchAt(e.clientX, e.clientY);
 });
+$('#playback').addEventListener('click', () => { hold = null; endPlay(); });
 addEventListener('pointermove', e => {
   if (!hold) return;
   if (G) { hold = null; return; }
@@ -1563,6 +1616,7 @@ addEventListener('pointermove', e => {
   hold.d += Math.hypot(dx, y - hold.y); hold.x = x; hold.y = y;
   if (hold.d < 16) return;
   hold.d = 0;
+  if (document.body.classList.contains('play')) playTouch();
   if (!RM) spawn({ k: 'dot', x, y, vy: -8, r: 5, life: 1.2, rgb: '200,215,255', a: .5 });
   for (const p of plantList) if (segDist(x, y, p.hx, p.hy, p.x, p.y) < 16) touchPlant(p, dir, true);
   if (inTree(x, y)) touchTree(dir, true);
